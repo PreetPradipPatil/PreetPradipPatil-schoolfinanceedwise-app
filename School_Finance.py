@@ -64,8 +64,9 @@ hr { border-color:#e2e8f0 !important; margin:14px 0 !important; }
 FINANCE_TOKEN_URL  = st.secrets["ods_api_finance"]["token_url"]
 FINANCE_API_KEY    = st.secrets["ods_api_finance"]["api_key"]
 FINANCE_API_SECRET = st.secrets["ods_api_finance"]["api_secret"]
-FINANCE_BASE_EDFI  = "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi"
-FINANCE_BASE_IDOE  = "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/idoe"
+FINANCE_BASE_EDFI  = st.secrets["ods_api_finance"]["finance_base_edfi"]
+FINANCE_BASE_IDOE  = st.secrets["ods_api_finance"]["finance_base_idoe"]
+
 
 FINANCE_CODE_APIS = {
     "FunctionCode":        f"{FINANCE_BASE_EDFI}/functionDimensions?schoolYear=2025&code={{code}}",
@@ -2336,7 +2337,7 @@ with btn_c:
         "<div style='font-size:17px;font-weight:800;color:#0d2d5e;margin-top:1px;'>Fetch &amp; Validate</div>"
         "<div style='width:32px;height:3px;background:#1a6fd4;border-radius:2px;margin-top:4px;'></div>"
         "<div style='font-size:12px;color:#64748b;margin-top:6px;margin-bottom:12px;font-weight:400;'>"
-        "Pull live data from the Ed-Fi ODS and run all validations (100% coverage)."
+        "Pull live data from the Ed-Fi ODS and run all validations."
         "</div>"
         "</div>",
         unsafe_allow_html=True,
