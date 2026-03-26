@@ -72,12 +72,12 @@ FINANCE_BASE_IDOE  = _creds.get("finance_base_idoe", "")
 
 
 FINANCE_CODE_APIS = {
-    "FunctionCode":        f"{FINANCE_BASE_EDFI}/functionDimensions?schoolYear=2025&code={{code}}",
-    "FundCode":            f"{FINANCE_BASE_EDFI}/fundDimensions?schoolYear=2025&code={{code}}",
-    "ObjectCode":          f"{FINANCE_BASE_EDFI}/objectDimensions?schoolYear=2025&code={{code}}",
-    "OperationalUnitCode": f"{FINANCE_BASE_EDFI}/operationalUnitDimensions?schoolYear=2025&code={{code}}",
-    "SectionCode":         f"{FINANCE_BASE_IDOE}/sectionDimensions?schoolYear=2025&code={{code}}",
-    "SubCategoryCode":     f"{FINANCE_BASE_IDOE}/subCategoryDimensions?schoolYear=2025&code={{code}}",
+    "FunctionCode":        f"{FINANCE_BASE_EDFI}/functionDimensions?fiscalYear=2025&code={{code}}",
+    "FundCode":            f"{FINANCE_BASE_EDFI}/fundDimensions?fiscalYear=2025&code={{code}}",
+    "ObjectCode":          f"{FINANCE_BASE_EDFI}/objectDimensions?fiscalYear=2025&code={{code}}",
+    "OperationalUnitCode": f"{FINANCE_BASE_EDFI}/operationalUnitDimensions?fiscalYear=2025&code={{code}}",
+    "SectionCode":         f"{FINANCE_BASE_IDOE}/sectionDimensions?fiscalYear=2025&code={{code}}",
+    "SubCategoryCode":     f"{FINANCE_BASE_IDOE}/subCategoryDimensions?fiscalYear=2025&code={{code}}",
 }
 
 CHART_OF_ACCOUNTS_URL               = f"{FINANCE_BASE_EDFI}/chartOfAccounts?fiscalYear=2025"
@@ -493,10 +493,10 @@ def check_dimension_code_via_api(field_name, code_value):
     label = f"{field_name} Code Validation (code={code_value})"
     found, status, count = _api_lookup(full_url, label)
     if found:
-        return True, f"✓ Code '{code_value}' found in {field_name} API (schoolYear=2025)"
+        return True, f"✓ Code '{code_value}' found in {field_name} API (fiscalYear=2025)"
     if status == 0:
         return False, f"Connection error — {field_name} API unreachable"
-    return False, f"✗ Code '{code_value}' NOT found in {field_name} API (schoolYear=2025)"
+    return False, f"✗ Code '{code_value}' NOT found in {field_name} API (fiscalYear=2025)"
 
 
 def check_chart_of_accounts_via_api(account_identifier, edorg_id):
