@@ -6,6 +6,9 @@ import io
 import base64
 from datetime import datetime, timedelta, timezone
 
+# ── Import shared auth module ─────────────────────────────────────
+from auth import render_login_page, render_logout_button, is_logged_in, get_vendor_creds, get_vendor_name
+
 st.set_page_config(
     page_title="EdWise | School Finance Certification",
     page_icon="🎓",
@@ -13,21 +16,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 :root { --bg-primary:#f8fafc; --bg-secondary:#ffffff; --text-primary:#1e293b; --border-color:#e2e8f0; }
-@media (prefers-color-scheme: dark) {
-    :root { --bg-primary:#0f172a; --bg-secondary:#1e293b; --text-primary:#f1f5f9; --border-color:#334155; }
-}
 html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
 .main { background: var(--bg-primary) !important; color: var(--text-primary) !important; }
 .block-container { padding-top:1rem !important; padding-left:1.8rem !important; padding-right:1.8rem !important; padding-bottom:3rem !important; max-width:100% !important; }
 header[data-testid="stHeader"] { display:none !important; }
 [data-testid="collapsedControl"] { display:none !important; }
 [data-testid="stSidebarCollapsedControl"] { display:none !important; }
-button[data-testid="baseButton-headerNoPadding"] { display:none !important; }
-[data-testid="stIconMaterial"] { display:none !important; }
 [data-testid="stBaseButton-primary"] {
     background:#1a6fd4 !important; color:#ffffff !important; border:none !important;
     border-radius:8px !important; font-weight:600 !important; font-size:14px !important;
@@ -40,14 +39,12 @@ button[data-testid="baseButton-headerNoPadding"] { display:none !important; }
     border:1.5px solid #1a6fd4 !important; border-radius:8px !important;
     font-weight:600 !important; white-space:nowrap !important;
 }
-.stDownloadButton > button:hover { background:#eff6ff !important; }
 .stTextInput input {
     background:#ffffff !important; border:1.5px solid #e2e8f0 !important;
     border-radius:8px !important; color:#1e293b !important;
     font-family:'JetBrains Mono', monospace !important; font-size:13px !important; padding:10px 14px !important;
 }
 .stTextInput input:focus { border-color:#1a6fd4 !important; box-shadow:0 0 0 3px rgba(26,111,212,0.1) !important; }
-.stTextInput label { font-size:12px !important; font-weight:600 !important; color:#64748b !important; }
 .stTabs [data-baseweb="tab-list"] { background:#f1f5f9 !important; border-radius:8px !important; padding:3px !important; gap:2px !important; }
 .stTabs [data-baseweb="tab"] { border-radius:6px !important; font-size:13px !important; font-weight:500 !important; color:#64748b !important; padding:7px 14px !important; }
 .stTabs [aria-selected="true"] { background:#ffffff !important; color:#1a6fd4 !important; font-weight:700 !important; box-shadow:0 1px 3px rgba(0,0,0,0.08) !important; }
@@ -59,13 +56,19 @@ hr { border-color:#e2e8f0 !important; margin:14px 0 !important; }
 """, unsafe_allow_html=True)
 
 # ════════════════════════════════════════════════════════════════════
-# API CONFIG
+# GATE: SHOW LOGIN IF NOT AUTHENTICATED
 # ════════════════════════════════════════════════════════════════════
-FINANCE_TOKEN_URL  = st.secrets["ods_api_finance"]["token_url"]
-FINANCE_API_KEY    = st.secrets["ods_api_finance"]["api_key"]
-FINANCE_API_SECRET = st.secrets["ods_api_finance"]["api_secret"]
-FINANCE_BASE_EDFI  = st.secrets["ods_api_finance"]["finance_base_edfi"]
-FINANCE_BASE_IDOE  = st.secrets["ods_api_finance"]["finance_base_idoe"]
+if not is_logged_in():
+    render_login_page()
+    st.stop()
+
+# ── Load vendor-specific API credentials from session ────────────
+_creds             = get_vendor_creds()
+FINANCE_TOKEN_URL  = _creds.get("token_url", "")
+FINANCE_API_KEY    = _creds.get("api_key", "")
+FINANCE_API_SECRET = _creds.get("api_secret", "")
+FINANCE_BASE_EDFI  = _creds.get("finance_base_edfi", "")
+FINANCE_BASE_IDOE  = _creds.get("finance_base_idoe", "")
 
 
 FINANCE_CODE_APIS = {
@@ -2112,17 +2115,17 @@ st.markdown(
     "padding:11px 18px;margin-bottom:16px;display:flex;align-items:center;"
     "justify-content:space-between;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);box-sizing:border-box;'>"
     "<div style='display:flex;align-items:center;gap:9px;flex-shrink:0;'>"
-    "<div style='width:34px;height:34px;flex-shrink:0;background:#1558b0;border-radius:7px;"
+    "<div style='width:34px;height:34px;flex-shrink:0;background:#dae1f2;border-radius:7px;"
     "display:flex;align-items:center;justify-content:center;font-size:17px;'>🎓</div>"
     "<div><div style='font-size:14px;font-weight:800;color:#0d2d5e;white-space:nowrap;'>EdWise Group</div>"
     "<div style='font-size:9px;color:#94a3b8;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;'>Vendor Certification Portal</div></div></div>"
     "<div style='text-align:center;flex:1;min-width:0;'>"
-    "<div style='font-size:13px;font-weight:700;color:#0d2d5e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>🎓 School Finance Verification</div>"
+    "<div style='font-size:13px;font-weight:700;color:##dae1f2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>🎓 School Finance Vendor Certification</div>"
     "<div style='font-size:9px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;margin-top:1px;white-space:nowrap;'>Ed-Fi ODS 2026 · Indiana DOE</div></div>"
     "<div style='text-align:right;flex-shrink:0;'>"
-    "<div style='font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;'>Demo User&nbsp;"
-    "<span style='background:#fef3c7;color:#d97706;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;'>DEMO</span></div>"
-    "<div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;'>🔒 Login coming soon</div></div>"
+    f"<div style='font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;'>{get_vendor_name()}&nbsp;"
+    f"<span style='background:#dbeafe;color:#1a6fd4;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;'>LOGGED IN</span></div>"
+    f"<div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;'>🔒 Secure session</div></div>"
     "</div>",
     unsafe_allow_html=True,
 )
@@ -2998,3 +3001,23 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width="stretch",
         )
+
+
+# ─────────────────────────────────────────────────────────────────
+# SIDEBAR — with vendor info + logout
+# ─────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown(
+        "<div style='padding:14px 12px 10px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;'>"
+        "<div style='font-size:15px;font-weight:800;color:#0d2d5e;'>🎓&nbsp; EdWise Group</div>"
+        "<div style='font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;'>Vendor Certification Portal</div>"
+        "</div>", unsafe_allow_html=True)
+
+
+    # ── Vendor info + logout ──────────────────────────────────────
+    render_logout_button(sidebar=True)
+    st.markdown(
+        f"<div style='padding:4px 12px 8px;font-size:11px;color:#94a3b8;'>"
+        f"v3.0.0 · Ed-Fi ODS 2026 · Indiana DOE</div>",
+        unsafe_allow_html=True,
+    )
