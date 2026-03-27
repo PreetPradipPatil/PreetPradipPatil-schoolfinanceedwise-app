@@ -5,6 +5,8 @@ import re
 import io
 import base64
 from datetime import datetime, timedelta, timezone
+from auth import render_logout_button
+import urllib.parse
 
 # ── Import shared auth module ─────────────────────────────────────
 from auth import render_login_page, render_logout_button, is_logged_in, get_vendor_creds, get_vendor_name
@@ -20,38 +22,155 @@ st.set_page_config(
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-:root { --bg-primary:#f8fafc; --bg-secondary:#ffffff; --text-primary:#1e293b; --border-color:#e2e8f0; }
-html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif !important; }
-.main { background: var(--bg-primary) !important; color: var(--text-primary) !important; }
-.block-container { padding-top:1rem !important; padding-left:1.8rem !important; padding-right:1.8rem !important; padding-bottom:3rem !important; max-width:100% !important; }
-header[data-testid="stHeader"] { display:none !important; }
-[data-testid="collapsedControl"] { display:none !important; }
-[data-testid="stSidebarCollapsedControl"] { display:none !important; }
+
+:root { 
+    --bg-primary:#f8fafc; 
+    --bg-secondary:#ffffff; 
+    --text-primary:#1e293b; 
+    --border-color:#e2e8f0; 
+}
+
+html, body, [class*="css"] { 
+    font-family: 'Plus Jakarta Sans', sans-serif !important; 
+}
+
+.main { 
+    background: var(--bg-primary) !important; 
+    color: var(--text-primary) !important; 
+}
+
+.block-container { 
+    padding-top:1rem !important; 
+    padding-left:1.8rem !important; 
+    padding-right:1.8rem !important; 
+    padding-bottom:3rem !important; 
+    max-width:100% !important; 
+}
+
+header[data-testid="stHeader"] { 
+    display:none !important; 
+}
+
+/* ✅ REMOVE SIDEBAR TOGGLE + keyboard_double_arrow_left ICON */
+button[kind="header"] { 
+    display: none !important; 
+}
+
+button[kind="header"] svg {
+    display: none !important;
+}
+
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+    display: none !important;
+}
+
+[data-testid="collapsedControl"] svg,
+[data-testid="stSidebarCollapsedControl"] svg,
+[data-testid="stSidebarCollapseButton"] svg {
+    display: none !important;
+}
+
+/* Extra fallback (new versions) */
+button[aria-label="Toggle sidebar"] {
+    display: none !important;
+}
+
+/* Buttons */
 [data-testid="stBaseButton-primary"] {
-    background:#1a6fd4 !important; color:#ffffff !important; border:none !important;
-    border-radius:8px !important; font-weight:600 !important; font-size:14px !important;
-    white-space:nowrap !important; padding:10px 20px !important;
-    box-shadow:0 2px 8px rgba(26,111,212,0.28) !important; justify-content:center !important;
+    background:#1a6fd4 !important; 
+    color:#ffffff !important; 
+    border:none !important;
+    border-radius:8px !important; 
+    font-weight:600 !important; 
+    font-size:14px !important;
+    white-space:nowrap !important; 
+    padding:10px 20px !important;
+    box-shadow:0 2px 8px rgba(26,111,212,0.28) !important; 
+    justify-content:center !important;
 }
-[data-testid="stBaseButton-primary"]:hover { background:#1558b0 !important; transform:translateY(-1px) !important; }
+
+[data-testid="stBaseButton-primary"]:hover { 
+    background:#1558b0 !important; 
+    transform:translateY(-1px) !important; 
+}
+
+/* Download button */
 .stDownloadButton > button {
-    background:#ffffff !important; color:#1a6fd4 !important;
-    border:1.5px solid #1a6fd4 !important; border-radius:8px !important;
-    font-weight:600 !important; white-space:nowrap !important;
+    background:#ffffff !important; 
+    color:#1a6fd4 !important;
+    border:1.5px solid #1a6fd4 !important; 
+    border-radius:8px !important;
+    font-weight:600 !important; 
+    white-space:nowrap !important;
 }
+
+/* Inputs */
 .stTextInput input {
-    background:#ffffff !important; border:1.5px solid #e2e8f0 !important;
-    border-radius:8px !important; color:#1e293b !important;
-    font-family:'JetBrains Mono', monospace !important; font-size:13px !important; padding:10px 14px !important;
+    background:#ffffff !important; 
+    border:1.5px solid #e2e8f0 !important;
+    border-radius:8px !important; 
+    color:#1e293b !important;
+    font-family:'JetBrains Mono', monospace !important; 
+    font-size:13px !important; 
+    padding:10px 14px !important;
 }
-.stTextInput input:focus { border-color:#1a6fd4 !important; box-shadow:0 0 0 3px rgba(26,111,212,0.1) !important; }
-.stTabs [data-baseweb="tab-list"] { background:#f1f5f9 !important; border-radius:8px !important; padding:3px !important; gap:2px !important; }
-.stTabs [data-baseweb="tab"] { border-radius:6px !important; font-size:13px !important; font-weight:500 !important; color:#64748b !important; padding:7px 14px !important; }
-.stTabs [aria-selected="true"] { background:#ffffff !important; color:#1a6fd4 !important; font-weight:700 !important; box-shadow:0 1px 3px rgba(0,0,0,0.08) !important; }
-[data-testid="stDataFrame"] { border:1px solid #e2e8f0 !important; border-radius:8px !important; }
-.streamlit-expanderHeader { background:#f8fafc !important; border:1px solid #e2e8f0 !important; border-radius:8px !important; font-size:13px !important; font-weight:600 !important; }
-hr { border-color:#e2e8f0 !important; margin:14px 0 !important; }
-[data-testid="stSidebarNav"] { display:none !important; }
+
+.stTextInput input:focus { 
+    border-color:#1a6fd4 !important; 
+    box-shadow:0 0 0 3px rgba(26,111,212,0.1) !important; 
+}
+
+/* Tabs */
+.stTabs [data-baseweb="tab-list"] { 
+    background:#f1f5f9 !important; 
+    border-radius:8px !important; 
+    padding:3px !important; 
+    gap:2px !important; 
+}
+
+.stTabs [data-baseweb="tab"] { 
+    border-radius:6px !important; 
+    font-size:13px !important; 
+    font-weight:500 !important; 
+    color:#64748b !important; 
+    padding:7px 14px !important; 
+}
+
+.stTabs [aria-selected="true"] { 
+    background:#ffffff !important; 
+    color:#1a6fd4 !important; 
+    font-weight:700 !important; 
+    box-shadow:0 1px 3px rgba(0,0,0,0.08) !important; 
+}
+
+/* DataFrame */
+[data-testid="stDataFrame"] { 
+    border:1px solid #e2e8f0 !important; 
+    border-radius:8px !important; 
+}
+
+/* Expander */
+.streamlit-expanderHeader { 
+    background:#f8fafc !important; 
+    border:1px solid #e2e8f0 !important; 
+    border-radius:8px !important; 
+    font-size:13px !important; 
+    font-weight:600 !important; 
+}
+
+/* Divider */
+hr { 
+    border-color:#e2e8f0 !important; 
+    margin:14px 0 !important; 
+}
+
+/* Hide sidebar nav */
+[data-testid="stSidebarNav"] { 
+    display:none !important; 
+}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -83,6 +202,24 @@ FINANCE_CODE_APIS = {
 CHART_OF_ACCOUNTS_URL               = f"{FINANCE_BASE_EDFI}/chartOfAccounts?fiscalYear=2025"
 FINANCIAL_COLLECTION_DESCRIPTOR_URL = f"{FINANCE_BASE_EDFI}/financialCollectionDescriptors"
 
+# ── Code digit length rules ────────────────────────
+CODE_LENGTH_RULES = {
+    "FundCode":            4,
+    "ObjectCode":          3,
+    "OperationalUnitCode": 4,
+    "SubCategoryCode":     2,
+    "SectionCode":         1,
+    "FunctionCode":        5,
+}
+
+# ── Financial Data Reset URLs ──────────────────────────────────────
+RESET_ENDPOINTS = {
+    "LocalActual":               f"{FINANCE_BASE_EDFI}/localActuals",
+    "LocalCapitalizedEquipment": f"{FINANCE_BASE_IDOE}/localCapitalizedEquipment",
+    "LocalSubaward":             f"{FINANCE_BASE_IDOE}/localSubawards",
+    "LocalUnusedLeavePayment":   f"{FINANCE_BASE_IDOE}/localUnusedLeavePayments",
+}
+
 # ════════════════════════════════════════════════════════════════════
 # FUND CLASSIFICATION RULES (Section 6)
 # Capital fund codes should NOT be used for leave/payroll payments
@@ -91,6 +228,9 @@ CAPITAL_FUND_CODES = {"4200", "4300", "4400", "4500", "4600", "4700", "4800", "4
 PAYROLL_OBJECT_CODES = {"100", "110", "120", "130", "140", "150", "160", "170", "180", "190",
                         "200", "210", "220", "230", "240", "250", "260", "270", "280", "290"}
 CAPITAL_FUNCTION_CODES = {"4000", "4100", "4200", "4300"}
+
+# RecordIdentifier is mandatory only for these 3 resources
+RECORD_IDENTIFIER_RESOURCES = {"LocalCapitalizedEquipment", "LocalSubaward", "LocalUnusedLeavePayment"}
 
 # ════════════════════════════════════════════════════════════════════
 # FINANCE RESOURCES & COLUMNS
@@ -114,16 +254,19 @@ FINANCE_COLS = {
         "AsOfDate","Amount","FinancialCollectionDescriptor",
     ],
     "LocalCapitalizedEquipment": [
+        "RecordIdentifier",
         "AccountIdentifier","EducationOrganizationId","FiscalYear",
         "AsOfDate","EquipmentType","EquipmentDescription","AcquisitionDate",
         "PaymentAmount","PerUnitCost","CapitalizedThreshold","FinancialCollectionDescriptor",
     ],
     "LocalSubaward": [
+        "RecordIdentifier",
         "AccountIdentifier","EducationOrganizationId","FiscalYear",
         "AsOfDate","ContractNumberOfYears","DepartmentName","Excess50k",
         "ExpenditureAmount","First50k","SubawardAmount","VendorOrganizationName","FinancialCollectionDescriptor",
     ],
     "LocalUnusedLeavePayment": [
+        "RecordIdentifier",
         "AccountIdentifier","EducationOrganizationId","FiscalYear",
         "AsOfDate","DirectUnusedLeavePaymentAmount","EmployeeName",
         "IndirectUnusedLeavePaymentAmount","JobTitle","PaymentDate","FinancialCollectionDescriptor",
@@ -154,6 +297,7 @@ FINANCE_SAMPLE_DEFAULTS = {
         "FinancialCollectionDescriptor": "1",
     },
     "LocalCapitalizedEquipment": {
+        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
         "AccountIdentifier": "S-1394-25110-940-5170-51",
         "EducationOrganizationId": 1094950000,
         "FiscalYear": 2025,
@@ -167,6 +311,7 @@ FINANCE_SAMPLE_DEFAULTS = {
         "FinancialCollectionDescriptor": "1",
     },
     "LocalSubaward": {
+        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
         "AccountIdentifier": "S-1394-25110-940-5170-51",
         "EducationOrganizationId": 1094950000,
         "FiscalYear": 2025,
@@ -181,6 +326,7 @@ FINANCE_SAMPLE_DEFAULTS = {
         "FinancialCollectionDescriptor": "1",
     },
     "LocalUnusedLeavePayment": {
+        "RecordIdentifier": "2c24fe1e-55cd-4b85-bf47-852a36c863dd",
         "AccountIdentifier": "S-1394-25110-940-5170-51",
         "EducationOrganizationId": 1094950000,
         "FiscalYear": 2025,
@@ -226,6 +372,7 @@ FINANCE_NESTED = {
         "FinancialCollectionDescriptor": "financialCollectionDescriptor",
     },
     "LocalCapitalizedEquipment": {
+        "RecordIdentifier": "recordIdentifier",
         "AccountIdentifier": "localAccountReference.accountIdentifier",
         "EducationOrganizationId": "localAccountReference.educationOrganizationId",
         "FiscalYear": "localAccountReference.fiscalYear",
@@ -239,6 +386,7 @@ FINANCE_NESTED = {
         "FinancialCollectionDescriptor": "financialCollectionDescriptor",
     },
     "LocalSubaward": {
+        "RecordIdentifier": "recordIdentifier",
         "AccountIdentifier": "localAccountReference.accountIdentifier",
         "EducationOrganizationId": "localAccountReference.educationOrganizationId",
         "FiscalYear": "localAccountReference.fiscalYear",
@@ -253,6 +401,7 @@ FINANCE_NESTED = {
         "FinancialCollectionDescriptor": "financialCollectionDescriptor",
     },
     "LocalUnusedLeavePayment": {
+        "RecordIdentifier": "recordIdentifier",
         "AccountIdentifier": "localAccountReference.accountIdentifier",
         "EducationOrganizationId": "localAccountReference.educationOrganizationId",
         "FiscalYear": "localAccountReference.fiscalYear",
@@ -525,16 +674,64 @@ def check_financial_collection_descriptor_via_api(raw_value):
         return code_value, False, "Connection error — FinancialCollectionDescriptor API unreachable"
     return code_value, False, f"✗ Descriptor code '{code_value}' NOT found in FinancialCollectionDescriptor API"
 
+# ════════════════════════════════════════════════════════════════════
+# CODE LENGTH VALIDATION HELPER
+# ════════════════════════════════════════════════════════════════════
+def validate_code_length(field_name, val_str):
+    required_len = CODE_LENGTH_RULES.get(field_name)
+    if required_len is None:
+        return True, None
+
+    actual_len = len(val_str)
+    if actual_len == required_len:
+        return True, (
+            f"✓ {field_name} '{val_str}' has correct fixed length of {required_len} digit(s). "
+            f"Code length complies with ODS data posting requirement."
+        )
+    elif actual_len < required_len:
+        expected_padded = val_str.zfill(required_len)
+        return False, (
+            f"✗ {field_name} '{val_str}' has {actual_len} digit(s) but must be exactly {required_len} digit(s). "
+            f"Codes must be zero-padded to a fixed length of {required_len} digit(s) per ODS data posting rules. "
+            f"Expected format: '{expected_padded}' (prefix with {required_len - actual_len} zero(s))."
+        )
+    else:
+        return False, (
+            f"✗ {field_name} '{val_str}' has {actual_len} digit(s) but must be exactly {required_len} digit(s). "
+            f"Code exceeds the fixed length requirement of {required_len} digit(s) per ODS data posting rules."
+        )
 
 # ════════════════════════════════════════════════════════════════════
 # FIELD-LEVEL VALIDATION
 # ════════════════════════════════════════════════════════════════════
-def validate_finance_field(field_name, value, query_params=None):
+def validate_finance_field(field_name, value, query_params=None, resource_name=None):
     if _is_empty(value):
+        if field_name == "RecordIdentifier" and resource_name in RECORD_IDENTIFIER_RESOURCES:
+            return False, (
+                f"❗ RecordIdentifier is a MANDATORY field for {resource_name}. "
+                "A unique alphanumeric record identifier must be posted for every record in this resource. "
+                "This field uniquely identifies each transaction record in the ODS."
+            )
         return False, f"❗ Missing value — '{field_name}' is required but was not populated in the API response"
 
     val_str = str(value).strip()
     qp = query_params or {}
+
+    if field_name == "RecordIdentifier":
+        if resource_name in RECORD_IDENTIFIER_RESOURCES:
+            if re.match(r"^[A-Za-z0-9\-_]+$", val_str):
+                return True, (
+                    f"✓ RecordIdentifier '{val_str}' is present and valid. "
+                    f"This unique alphanumeric identifier correctly identifies this {resource_name} transaction record."
+                )
+            else:
+                return False, (
+                    f"✗ RecordIdentifier '{val_str}' contains invalid characters. "
+                    "RecordIdentifier must be alphanumeric (letters, digits, hyphens, underscores only). "
+                    f"This field is mandatory for {resource_name} and must uniquely identify each record."
+                )
+        else:
+            return True, f"✓ RecordIdentifier '{val_str}' is present."
 
     if field_name == "AccountIdentifier":
         expected = str(qp.get("AccountIdentifier", "")).strip()
@@ -549,10 +746,8 @@ def validate_finance_field(field_name, value, query_params=None):
 
     if field_name == "EducationOrganizationId":
         expected = str(qp.get("EducationOrganizationId", "")).strip()
-        try:
-            int_val = int(float(val_str))
-        except Exception:
-            return False, f"✗ Must be numeric — got '{val_str}'"
+        try: int_val = int(float(val_str))
+        except Exception: return False, f"✗ Must be numeric — got '{val_str}'"
         if expected and str(int_val) != expected:
             return False, (
                 f"✗ Mismatch — API returned '{int_val}' but query param is '{expected}'. "
@@ -562,12 +757,9 @@ def validate_finance_field(field_name, value, query_params=None):
 
     if field_name == "FiscalYear":
         expected = str(qp.get("FiscalYear", "")).strip()
-        try:
-            yr = int(float(val_str))
-        except Exception:
-            return False, f"✗ Must be numeric — got '{val_str}'"
-        if not (2000 <= yr <= 2100):
-            return False, f"✗ Year '{yr}' is out of expected range (2000–2100)"
+        try: yr = int(float(val_str))
+        except Exception: return False, f"✗ Must be numeric — got '{val_str}'"
+        if not (2000 <= yr <= 2100): return False, f"✗ Year '{yr}' is out of expected range (2000–2100)"
         if expected and str(yr) != expected:
             return False, (
                 f"✗ Mismatch — API returned '{yr}' but query param is '{expected}'. "
@@ -576,24 +768,29 @@ def validate_finance_field(field_name, value, query_params=None):
         return True, f"✓ FiscalYear '{yr}' matches query param and is within valid range"
 
     if field_name == "AccountName":
-        if len(val_str) == 0:
-            return False, "✗ AccountName is empty — a non-empty text value is required"
+        if len(val_str) == 0: return False, "✗ AccountName is empty — a non-empty text value is required"
         return True, f"✓ AccountName is a valid character string: '{val_str}'"
 
     if field_name == "ChartOfAccountIdentifier":
-        if len(val_str) == 0:
-            return False, "✗ ChartOfAccountIdentifier is empty"
+        if len(val_str) == 0: return False, "✗ ChartOfAccountIdentifier is empty"
         return True, f"✓ ChartOfAccountIdentifier '{val_str}' is a non-empty string (API cross-check done separately)"
 
     if field_name == "ChartOfAccountEducationOrganizationId":
-        try:
-            int(float(val_str))
-        except Exception:
-            return False, f"✗ ChartOfAccountEducationOrganizationId must be numeric — got '{val_str}'"
+        try: int(float(val_str))
+        except Exception: return False, f"✗ ChartOfAccountEducationOrganizationId must be numeric — got '{val_str}'"
         return True, f"✓ ChartOfAccountEducationOrganizationId '{val_str}' is valid numeric (API cross-check done separately)"
 
-    if field_name in FINANCE_CODE_APIS:
-        return check_dimension_code_via_api(field_name, val_str)
+    if field_name in CODE_LENGTH_RULES:
+        length_valid, length_reason = validate_code_length(field_name, val_str)
+        if not length_valid:
+            return False, length_reason
+        if field_name in FINANCE_CODE_APIS:
+            api_valid, api_reason = check_dimension_code_via_api(field_name, val_str)
+            if api_valid:
+                return True, f"{length_reason} | API: {api_reason}"
+            else:
+                return False, f"{length_reason} | API: {api_reason}"
+        return True, length_reason
 
     if field_name == "FinancialCollectionDescriptor":
         code_val, is_valid, reason = check_financial_collection_descriptor_via_api(val_str)
@@ -604,8 +801,7 @@ def validate_finance_field(field_name, value, query_params=None):
             try:
                 datetime.strptime(val_str, "%Y-%m-%d")
                 return True, f"✓ '{field_name}' is a valid date in YYYY-MM-DD format: '{val_str}'"
-            except ValueError:
-                return False, f"✗ '{val_str}' is not a real calendar date — check day/month values"
+            except ValueError: return False, f"✗ '{val_str}' is not a real calendar date — check day/month values"
         return False, f"✗ '{field_name}' has invalid format '{val_str}' — expected YYYY-MM-DD"
 
     numeric_fields = {
@@ -621,22 +817,17 @@ def validate_finance_field(field_name, value, query_params=None):
         "IndirectUnusedLeavePaymentAmount": "Indirect unused leave payment",
     }
     if field_name in numeric_fields:
-        try:
-            num = float(val_str)
-        except Exception:
-            return False, f"✗ {numeric_fields[field_name]} must be numeric — got '{val_str}'"
-        if num < 0:
-            return False, f"✗ {numeric_fields[field_name]} should be non-negative — got '{num}'"
+        try: num = float(val_str)
+        except Exception: return False, f"✗ {numeric_fields[field_name]} must be numeric — got '{val_str}'"
+        if num < 0: return False, f"✗ {numeric_fields[field_name]} should be non-negative — got '{num}'"
         return True, f"✓ {numeric_fields[field_name]} is valid: {num}"
 
     if field_name == "ContractNumberOfYears":
         try:
             num = float(val_str)
-            if num < 0 or num != int(num):
-                return False, f"✗ ContractNumberOfYears must be a non-negative integer — got '{val_str}'"
+            if num < 0 or num != int(num): return False, f"✗ ContractNumberOfYears must be a non-negative integer — got '{val_str}'"
             return True, f"✓ ContractNumberOfYears is valid non-negative integer: {int(num)}"
-        except Exception:
-            return False, f"✗ ContractNumberOfYears must be numeric — got '{val_str}'"
+        except Exception: return False, f"✗ ContractNumberOfYears must be numeric — got '{val_str}'"
 
     char_fields = {
         "EquipmentType": "Equipment type",
@@ -647,12 +838,10 @@ def validate_finance_field(field_name, value, query_params=None):
         "JobTitle": "Job title",
     }
     if field_name in char_fields:
-        if len(val_str) == 0:
-            return False, f"✗ {char_fields[field_name]} is an empty string — a non-empty character value is required"
+        if len(val_str) == 0: return False, f"✗ {char_fields[field_name]} is an empty string — a non-empty character value is required"
         return True, f"✓ {char_fields[field_name]} is a valid character string: '{val_str}'"
 
     return True, f"✓ Value present: '{val_str}'"
-
 
 # ════════════════════════════════════════════════════════════════════
 # SECTION 1 — CORE CALCULATION VALIDATIONS
@@ -915,15 +1104,9 @@ def run_unused_leave_business_rules(row, rec_num):
 
 
 # ════════════════════════════════════════════════════════════════════
-# SECTION 3 — BUDGET & ALLOCATION VALIDATIONS (NEW)
+# SECTION 3 — BUDGET & ALLOCATION VALIDATIONS
 # ════════════════════════════════════════════════════════════════════
 def run_budget_allocation_validations(target_dfs_by_res, approved_budget_map):
-    """
-    §3 Budget & Allocation Validations:
-    - Actual Amount must not exceed approved budget for the account
-    - Remaining balance after each allocation must never be negative
-    - Partial allocation tracking across equipment, subaward, leave
-    """
     results = []
     actual_df = target_dfs_by_res.get("LocalActual", pd.DataFrame())
 
@@ -947,7 +1130,6 @@ def run_budget_allocation_validations(target_dfs_by_res, approved_budget_map):
         if amt is None:
             continue
 
-        # Rule 1: Actual Amount ≤ Approved Budget (if user provided budget)
         budget_key = f"{acc}_{rn}"
         approved = _to_float(approved_budget_map.get(budget_key) or approved_budget_map.get(acc))
         if approved is not None:
@@ -979,8 +1161,6 @@ def run_budget_allocation_validations(target_dfs_by_res, approved_budget_map):
                 "Reason": "⚠️ Approved Budget not provided for this account — enter budget in Step 1 to enable this check",
             })
 
-    # Rule 2: Allocation balance tracking — remaining after each category must be ≥ 0
-    # Collect actual amounts per (acc, rn)
     actual_amounts = {}
     for _, row in actual_df.iterrows():
         if row.get("_api_status", "FOUND") != "FOUND":
@@ -1047,18 +1227,11 @@ def run_budget_allocation_validations(target_dfs_by_res, approved_budget_map):
 
 
 # ════════════════════════════════════════════════════════════════════
-# SECTION 4 — DUPLICATE TRANSACTION DETECTION (NEW)
+# SECTION 4 — DUPLICATE TRANSACTION DETECTION
 # ════════════════════════════════════════════════════════════════════
 def run_duplicate_detection(target_dfs_by_res):
-    """
-    §4 Data Consistency & Duplication:
-    - Same AccountIdentifier + FiscalYear + AsOfDate + Amount combination flagged as duplicate
-    - Financial values must not be double-counted across tables
-    - Same transaction in multiple tables causes duplicate financial impact
-    """
     results = []
 
-    # Build transaction fingerprints across all tables
     all_transactions = []
     for res in FINANCE_RESOURCES:
         df = target_dfs_by_res.get(res, pd.DataFrame())
@@ -1072,7 +1245,6 @@ def run_duplicate_detection(target_dfs_by_res):
             aod  = str(row.get("AsOfDate", "")).strip()
             rn   = row.get("_record_num", 1)
 
-            # Determine amount field per resource
             amt = None
             if res == "LocalActual":
                 amt = _to_float(row.get("Amount"))
@@ -1095,7 +1267,6 @@ def run_duplicate_detection(target_dfs_by_res):
                     "RecordNum": rn,
                 })
 
-    # Check within-table duplicates (same resource, same key fields)
     within_table_keys = {}
     for txn in all_transactions:
         key = (txn["resource"], txn["AccountIdentifier"], txn["FiscalYear"], txn["AsOfDate"], txn["Amount"])
@@ -1115,7 +1286,6 @@ def run_duplicate_detection(target_dfs_by_res):
                 "Reason": f"✗ DUPLICATE DETECTED in {res} — same AccountIdentifier+FiscalYear+AsOfDate+Amount appears {len(rec_nums)} times. Records: {rec_nums}. Duplicate financial impact detected.",
             })
 
-    # Cross-table double-counting check: same amount on same date in multiple tables
     cross_table_keys = {}
     for txn in all_transactions:
         key = (txn["AccountIdentifier"], txn["FiscalYear"], txn["AsOfDate"], txn["Amount"])
@@ -1135,7 +1305,6 @@ def run_duplicate_detection(target_dfs_by_res):
                 "Reason": f"⚠️ Same amount ({amt}) on {aod} appears in multiple tables: {resources}. Review for potential double-counting of financial impact.",
             })
 
-    # Summary: if no duplicates found
     if not results:
         results.append({
             "Record #": "All",
@@ -1248,18 +1417,11 @@ def run_time_based_validations(row, rec_num, res_name):
 
 
 # ════════════════════════════════════════════════════════════════════
-# SECTION 6 — FUND & CLASSIFICATION RULES (NEW)
+# SECTION 6 — FUND & CLASSIFICATION RULES
 # ════════════════════════════════════════════════════════════════════
 def run_fund_classification_validations(target_dfs_by_res):
-    """
-    §6 Fund & Classification Rules:
-    - Capital fund codes must not be used for payroll/leave payments
-    - Capital function codes should not appear in leave payment accounts
-    - ObjectCode must align with transaction type
-    """
     results = []
 
-    # Get LocalAccount dimension codes for each record
     account_df = target_dfs_by_res.get("LocalAccount", pd.DataFrame())
     leave_df   = target_dfs_by_res.get("LocalUnusedLeavePayment", pd.DataFrame())
     equip_df   = target_dfs_by_res.get("LocalCapitalizedEquipment", pd.DataFrame())
@@ -1284,7 +1446,6 @@ def run_fund_classification_validations(target_dfs_by_res):
         func_c   = str(acct_row.get("FunctionCode", "")).strip()
         obj_c    = str(acct_row.get("ObjectCode", "")).strip()
 
-        # Rule: Capital fund codes must not be used for leave payments
         is_capital_fund = fund_c in CAPITAL_FUND_CODES or fund_c.startswith("4")
         has_leave = not leave_df.empty and any(
             str(r.get("AccountIdentifier", "")).strip() == acc
@@ -1320,7 +1481,6 @@ def run_fund_classification_validations(target_dfs_by_res):
                 "Reason": f"✓ FundCode '{fund_c}' is not a capital fund — no fund misuse concern",
             })
 
-        # Rule: Capital function codes should not be used for leave payments
         is_capital_func = func_c in CAPITAL_FUNCTION_CODES or func_c.startswith("4")
         if is_capital_func and has_leave:
             results.append({
@@ -1341,8 +1501,6 @@ def run_fund_classification_validations(target_dfs_by_res):
                 "Reason": f"✓ Capital FunctionCode '{func_c}' is not associated with leave payments",
             })
 
-        # Rule: ObjectCode must align with transaction type
-        # Payroll object codes should not appear on equipment records
         is_payroll_obj = obj_c in PAYROLL_OBJECT_CODES or (obj_c.isdigit() and 100 <= int(obj_c) <= 290)
         has_equipment = not equip_df.empty and any(
             str(r.get("AccountIdentifier", "")).strip() == acc
@@ -1368,8 +1526,6 @@ def run_fund_classification_validations(target_dfs_by_res):
                 "Reason": f"✓ ObjectCode '{obj_c}' does not indicate a classification conflict with transaction types for this account",
             })
 
-        # Rule: AccountIdentifier structure maps to financial dimensions
-        # The format should encode Fund, Function, Object etc. (e.g., S-1394-25110-940-5170-51)
         parts = acc.split("-")
         if len(parts) >= 3:
             results.append({
@@ -1394,15 +1550,9 @@ def run_fund_classification_validations(target_dfs_by_res):
 
 
 # ════════════════════════════════════════════════════════════════════
-# SECTION 7 — MULTI-YEAR & CONTRACT-BASED VALIDATIONS (NEW)
+# SECTION 7 — MULTI-YEAR & CONTRACT-BASED VALIDATIONS
 # ════════════════════════════════════════════════════════════════════
 def run_multi_year_validations(target_dfs_by_res):
-    """
-    §7 Multi-Year & Contract-Based Validations:
-    - Financial amounts must align with ContractNumberOfYears
-    - Large expenditures should not be concentrated in a single year
-    - Annual average check: ExpenditureAmount vs ContractNumberOfYears
-    """
     results = []
     subaward_df = target_dfs_by_res.get("LocalSubaward", pd.DataFrame())
 
@@ -1449,8 +1599,6 @@ def run_multi_year_validations(target_dfs_by_res):
 
         annual_avg = round(exp / cny, 2)
 
-        # Rule: Check if single-year expenditure looks reasonable vs contract length
-        # Flag if the single-year expenditure exceeds 80% of what would be a large multi-year contract
         if cny > 1 and exp > 500_000:
             results.append({
                 "Record #": rn,
@@ -1470,7 +1618,6 @@ def run_multi_year_validations(target_dfs_by_res):
                 "Reason": f"✓ ExpenditureAmount ({exp:,.2f}) is reasonable for a {int(cny)}-year contract (implied avg {annual_avg:,.2f}/year) — no abnormal concentration detected",
             })
 
-        # Rule: Annual average must be positive and meaningful
         if annual_avg > 0:
             results.append({
                 "Record #": rn,
@@ -1606,16 +1753,9 @@ def run_reasonability_checks(row, rec_num, res_name):
 
 
 # ════════════════════════════════════════════════════════════════════
-# SECTION 9 — LIFECYCLE & PROCESS VALIDATIONS (NEW)
+# SECTION 9 — LIFECYCLE & PROCESS VALIDATIONS
 # ════════════════════════════════════════════════════════════════════
 def run_lifecycle_validations(target_dfs_by_res):
-    """
-    §9 Lifecycle & Process Validations:
-    - Payment records must have corresponding expenditure context
-    - LocalActual must exist before equipment/subaward/leave payments are valid
-    - Payments without expenditure context are flagged
-    - Logical progression: LocalAccount → LocalActual → Transactions
-    """
     results = []
 
     account_df = target_dfs_by_res.get("LocalAccount", pd.DataFrame())
@@ -1624,7 +1764,6 @@ def run_lifecycle_validations(target_dfs_by_res):
     sub_df     = target_dfs_by_res.get("LocalSubaward", pd.DataFrame())
     leave_df   = target_dfs_by_res.get("LocalUnusedLeavePayment", pd.DataFrame())
 
-    # Build sets of accounts that have each layer
     def get_active_accounts(df):
         if df.empty:
             return set()
@@ -1655,7 +1794,6 @@ def run_lifecycle_validations(target_dfs_by_res):
         })
         return pd.DataFrame(results)
 
-    # Build rec_num map from any available df
     acc_to_recnum = {}
     for _df in [account_df, actual_df, equip_df, sub_df, leave_df]:
         if _df.empty:
@@ -1668,7 +1806,6 @@ def run_lifecycle_validations(target_dfs_by_res):
 
     for acc in sorted(all_accts):
         rn = acc_to_recnum.get(acc, 1)
-        # Rule 1: LocalAccount must exist (foundation layer)
         if acc in acct_with_account:
             results.append({
                 "Record #": rn,
@@ -1688,7 +1825,6 @@ def run_lifecycle_validations(target_dfs_by_res):
                 "Reason": f"✗ LocalAccount NOT found for '{acc}' — financial transactions cannot be valid without a corresponding account definition",
             })
 
-        # Rule 2: LocalActual must exist before payment transactions
         has_any_payment = (acc in acct_with_equip or acc in acct_with_sub or acc in acct_with_leave)
         if has_any_payment:
             if acc in acct_with_actual:
@@ -1710,7 +1846,6 @@ def run_lifecycle_validations(target_dfs_by_res):
                     "Reason": f"✗ Payment transactions found for '{acc}' but NO LocalActual record exists — payments must not be recorded without corresponding expenditure or approval context (lifecycle violation)",
                 })
 
-        # Rule 3: Equipment payments require LocalActual context
         if acc in acct_with_equip:
             if acc in acct_with_actual:
                 results.append({
@@ -1731,7 +1866,6 @@ def run_lifecycle_validations(target_dfs_by_res):
                     "Reason": f"✗ CapitalizedEquipment payment for '{acc}' has NO LocalActual expenditure context — payment recorded without approval/expenditure foundation",
                 })
 
-        # Rule 4: Subaward payments require LocalActual context
         if acc in acct_with_sub:
             if acc in acct_with_actual:
                 results.append({
@@ -1752,7 +1886,6 @@ def run_lifecycle_validations(target_dfs_by_res):
                     "Reason": f"✗ Subaward payment for '{acc}' has NO LocalActual expenditure context — payment recorded without approval/expenditure foundation",
                 })
 
-        # Rule 5: Leave payments require LocalActual context
         if acc in acct_with_leave:
             if acc in acct_with_actual:
                 results.append({
@@ -1969,7 +2102,7 @@ def run_cross_table_consistency(target_dfs_by_res):
 
 
 # ════════════════════════════════════════════════════════════════════
-# BUSINESS RULES RUNNER (combines all sections per resource)
+# BUSINESS RULES RUNNER
 # ════════════════════════════════════════════════════════════════════
 def run_business_rules_for_resource(res_name, df):
     all_rows = []
@@ -2108,26 +2241,285 @@ def prep_display_df(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ════════════════════════════════════════════════════════════════════
-# MAIN UI
+# FIX 3: HELPER — Render the top ribbon with dynamic page title
 # ════════════════════════════════════════════════════════════════════
-st.markdown(
-    "<div style='background:#ffffff;border:1.5px solid #cbd5e1;border-radius:10px;"
-    "padding:11px 18px;margin-bottom:16px;display:flex;align-items:center;"
-    "justify-content:space-between;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);box-sizing:border-box;'>"
-    "<div style='display:flex;align-items:center;gap:9px;flex-shrink:0;'>"
-    "<div style='width:34px;height:34px;flex-shrink:0;background:#dae1f2;border-radius:7px;"
-    "display:flex;align-items:center;justify-content:center;font-size:17px;'>🎓</div>"
-    "<div><div style='font-size:14px;font-weight:800;color:#0d2d5e;white-space:nowrap;'>EdWise Group</div>"
-    "<div style='font-size:9px;color:#94a3b8;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;'>Vendor Certification Portal</div></div></div>"
-    "<div style='text-align:center;flex:1;min-width:0;'>"
-    "<div style='font-size:13px;font-weight:700;color:##dae1f2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>🎓 School Finance Vendor Certification</div>"
-    "<div style='font-size:9px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;margin-top:1px;white-space:nowrap;'>Ed-Fi ODS 2026 · Indiana DOE</div></div>"
-    "<div style='text-align:right;flex-shrink:0;'>"
-    f"<div style='font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;'>{get_vendor_name()}&nbsp;"
-    f"<span style='background:#dbeafe;color:#1a6fd4;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;'>LOGGED IN</span></div>"
-    f"<div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;'>🔒 Secure session</div></div>"
-    "</div>",
-    unsafe_allow_html=True,
+def render_top_ribbon(page_title: str = "School Finance Vendor Certification", page_subtitle: str = "Ed-Fi ODS 2026 · Indiana DOE"):
+    """Renders the top header ribbon with a dynamic page title."""
+    st.markdown(
+        f"<div style='background:#ffffff;border:1.5px solid #cbd5e1;border-radius:10px;"
+        f"padding:11px 18px;margin-bottom:16px;display:flex;align-items:center;"
+        f"justify-content:space-between;gap:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06);box-sizing:border-box;'>"
+        f"<div style='display:flex;align-items:center;gap:9px;flex-shrink:0;'>"
+        f"<div style='width:34px;height:34px;flex-shrink:0;background:#dae1f2;border-radius:7px;"
+        f"display:flex;align-items:center;justify-content:center;font-size:17px;'>🎓</div>"
+        f"<div><div style='font-size:14px;font-weight:800;color:#0d2d5e;white-space:nowrap;'>EdWise Group</div>"
+        f"<div style='font-size:9px;color:#94a3b8;letter-spacing:1.4px;text-transform:uppercase;white-space:nowrap;'>Vendor Certification Portal</div></div></div>"
+        f"<div style='text-align:center;flex:1;min-width:0;'>"
+        f"<div style='font-size:13px;font-weight:700;color:#0d2d5e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>🎓 {page_title}</div>"
+        f"<div style='font-size:9px;color:#94a3b8;letter-spacing:1px;text-transform:uppercase;margin-top:1px;white-space:nowrap;'>{page_subtitle}</div></div>"
+        f"<div style='text-align:right;flex-shrink:0;'>"
+        f"<div style='font-size:12px;font-weight:600;color:#1e293b;white-space:nowrap;'>{get_vendor_name()}&nbsp;"
+        f"<span style='background:#dbeafe;color:#1a6fd4;font-size:10px;font-weight:700;padding:2px 8px;border-radius:50px;'>LOGGED IN</span></div>"
+        f"<div style='font-size:10px;color:#94a3b8;margin-top:2px;white-space:nowrap;'>🔒 Secure session</div></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════
+# SIDEBAR — Navigation
+# ════════════════════════════════════════════════════════════════════
+with st.sidebar:
+    st.markdown(
+        "<div style='padding:14px 12px 10px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;'>"
+        "<div style='font-size:15px;font-weight:800;color:#0d2d5e;'>🎓&nbsp; EdWise Group</div>"
+        "<div style='font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;'>School Finance Portal</div>"
+        "</div>", unsafe_allow_html=True)
+
+    st.markdown("<div style='padding:7px 12px 3px;margin-top:8px;font-size:10px;font-weight:700;color:#94a3b8;letter-spacing:2px;text-transform:uppercase;'>Navigation</div>", unsafe_allow_html=True)
+
+    is_verif = st.session_state.get("fin_active_tab") == "verification"
+    if is_verif:
+        st.markdown("<div style='background:#eff6ff;border-left:3px solid #1a6fd4;margin:0;padding:0;'>", unsafe_allow_html=True)
+    if st.button("📊  Finance Data Verification", key="nav_verification", width="stretch"):
+        st.session_state.fin_active_tab = "verification"
+        st.rerun()
+    if is_verif:
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    is_reset = st.session_state.get("fin_active_tab") == "reset"
+    if is_reset:
+        st.markdown("<div style='background:#eff6ff;border-left:3px solid #1a6fd4;margin:0;padding:0;'>", unsafe_allow_html=True)
+    if st.button("🔄  Financial Data Reset", key="nav_reset", width="stretch"):
+        st.session_state.fin_active_tab = "reset"
+        st.rerun()
+    if is_reset:
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Single logout button — only here in sidebar nav ──────────────
+    render_logout_button(sidebar=True)
+    st.markdown(
+        f"<div style='padding:4px 12px 8px;font-size:11px;color:#94a3b8;'>"
+        f"v3.0.0 · Ed-Fi ODS 2026 · Indiana DOE</div>",
+        unsafe_allow_html=True,
+    )
+
+
+# ════════════════════════════════════════════════════════════════════
+# FINANCIAL DATA RESET TAB
+# ════════════════════════════════════════════════════════════════════
+if st.session_state.get("fin_active_tab") == "reset":
+
+    # ── FIX 3: Dynamic ribbon for Financial Data Reset page ──
+    render_top_ribbon(
+        page_title="Financial Data Reset",
+        page_subtitle="Zero-Count Verification · Ed-Fi ODS 2026 · Indiana DOE"
+    )
+
+    st.markdown(
+        "<div style='margin-bottom:10px;'>"
+        "<span style='font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#1a6fd4;'>Financial Data Reset</span>"
+        "<div style='font-size:17px;font-weight:800;color:#0d2d5e;margin-top:1px;'>Reset Vendor Finance Data</div>"
+        "<div style='width:32px;height:3px;background:#1a6fd4;border-radius:2px;margin-top:4px;'></div>"
+        "<div style='font-size:12px;color:#64748b;margin-top:6px;font-weight:400;'>"
+        "After vendor resets data, verify that all records return zero count. "
+        "Provide EducationOrganizationId, FiscalYear, and FinancialCollectionDescriptor as query parameters."
+        "</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+    # Reset Query Parameters
+    rc1, rc2, rc3 = st.columns(3)
+
+    with rc1:
+        reset_edorg = st.text_input(
+            "EducationOrganizationId",
+            value="1094950000",
+            key="reset_edorg",
+            placeholder="e.g. 1094950000"
+        )
+
+    with rc2:
+        reset_fy = st.text_input(
+            "FiscalYear",
+            value="2025",
+            key="reset_fy",
+            placeholder="e.g. 2025"
+        )
+
+    with rc3:
+        reset_descriptor = st.text_input(
+            "FinancialCollectionDescriptor",
+            value="uri://doe.in.gov/FinancialCollectionDescriptor#1",
+            key="reset_descriptor",
+            placeholder="e.g. uri://doe.in.gov/FinancialCollectionDescriptor#1"
+        )
+
+    # Encode the descriptor for URL
+    reset_descriptor_encoded = urllib.parse.quote(reset_descriptor, safe='')
+
+    # Divider line
+    st.divider()
+
+    # Submit button
+    if st.button("Submit Reset"):
+        base_url = "https://doe-edfiods-a-v-v2026-ca.ashytree-64da9ba4.eastus.azurecontainerapps.io:443/2026/data/v3/ed-fi/localActuals"
+        resolved = (
+            f"{base_url}?educationOrganizationId={reset_edorg}"
+            f"&fiscalYear={reset_fy}"
+            f"&financialCollectionDescriptor={reset_descriptor_encoded}"
+            f"&totalCount=true"
+        )
+
+        st.write("Resolved URL:")
+        st.code(resolved)
+
+    # Reset resources config
+    RESET_RESOURCES = [
+        ("LocalActual",               "📊 LocalActual",               RESET_ENDPOINTS["LocalActual"]),
+        ("LocalCapitalizedEquipment", "🖥️ LocalCapitalizedEquipment", RESET_ENDPOINTS["LocalCapitalizedEquipment"]),
+        ("LocalSubaward",             "🤝 LocalSubaward",             RESET_ENDPOINTS["LocalSubaward"]),
+        ("LocalUnusedLeavePayment",   "🏖️ LocalUnusedLeavePayment",   RESET_ENDPOINTS["LocalUnusedLeavePayment"]),
+    ]
+
+    with st.expander("⚙️ Reset API Endpoints (resolved with query params)", expanded=True):
+        for res_key, res_label, base_url in RESET_RESOURCES:
+            resolved = (
+                f"{base_url}"
+                f"?educationOrganizationId={reset_edorg}"
+                f"&fiscalYear={reset_fy}"
+                f"&financialCollectionDescriptor={reset_descriptor_encoded}"
+            )
+            st.markdown(
+                f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px 12px;margin-bottom:6px;'>"
+                f"<span style='font-size:11px;font-weight:700;color:#1a6fd4;'>{res_label}</span><br>"
+                f"<code style='font-size:11px;color:#475569;word-break:break-all;'>{resolved}</code>"
+                f"</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    run_reset_check = st.button("▶  Run Reset Verification", type="primary")
+
+    if run_reset_check:
+        if not reset_edorg.strip() or not reset_fy.strip() or not reset_descriptor.strip():
+            st.error("❌ Please provide EducationOrganizationId, FiscalYear, and FinancialCollectionDescriptor.")
+        else:
+            reset_results = []
+            with st.spinner("Checking reset status for all resources…"):
+                for res_key, res_label, base_url in RESET_RESOURCES:
+                    resolved_url = (
+                        f"{base_url}"
+                        f"?educationOrganizationId={reset_edorg.strip()}"
+                        f"&fiscalYear={reset_fy.strip()}"
+                        f"&financialCollectionDescriptor={reset_descriptor_encoded}"
+                        f"&totalCount=true"
+                    )
+                    try:
+                        token = get_bearer_token()
+                        r = requests.get(resolved_url, headers={"Authorization": f"Bearer {token}"}, timeout=15)
+                        http_status = r.status_code
+                        try:
+                            resp_data = r.json()
+                            records = resp_data if isinstance(resp_data, list) else resp_data.get("value", [])
+                            count = len(records) if isinstance(records, list) else 0
+                            total_count_header = r.headers.get("Total-Count", None)
+                            if total_count_header is not None:
+                                count = int(total_count_header)
+                        except Exception:
+                            count = -1
+                            resp_data = {}
+
+                        if http_status == 200 and count == 0:
+                            status = "✅ Pass"
+                            reason = f"✓ Data reset verified — API returned 0 records for {res_label} with the given parameters. Reset is complete."
+                        elif http_status == 200 and count > 0:
+                            status = "❌ Fail"
+                            reason = f"✗ Reset INCOMPLETE — API returned {count} record(s) for {res_label}. Vendor must post all records with zero values or delete before this check passes."
+                        elif http_status == 200 and count == -1:
+                            status = "⚠️ Flag"
+                            reason = f"⚠️ HTTP 200 but could not parse record count for {res_label}. Manual verification recommended."
+                        else:
+                            status = "❌ Fail"
+                            reason = f"✗ API returned HTTP {http_status} for {res_label} — endpoint may be unreachable or parameters are incorrect."
+
+                        reset_results.append({
+                            "Resource": res_label,
+                            "URL": resolved_url,
+                            "HTTP Status": http_status,
+                            "Record Count": count if count >= 0 else "N/A",
+                            "Status": status,
+                            "Reason": reason,
+                        })
+
+                        with st.expander(f"🔍 API Debug — {res_label}", expanded=False):
+                            st.markdown(f"**URL:** `{resolved_url}`")
+                            st.caption(f"HTTP Status: {http_status} | Records: {count}")
+                            try: st.json(resp_data)
+                            except Exception: st.write(resp_data)
+
+                    except requests.exceptions.ConnectionError:
+                        reset_results.append({"Resource": res_label, "URL": resolved_url, "HTTP Status": 0, "Record Count": "N/A", "Status": "❌ Fail", "Reason": f"✗ Connection error — {res_label} API unreachable"})
+                    except Exception as e:
+                        reset_results.append({"Resource": res_label, "URL": resolved_url, "HTTP Status": 0, "Record Count": "N/A", "Status": "❌ Fail", "Reason": f"✗ Error: {str(e)}"})
+
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(
+                "<div style='margin-bottom:10px;'>"
+                "<span style='font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#1a6fd4;'>Reset Verification Results</span>"
+                "<div style='font-size:17px;font-weight:800;color:#0d2d5e;margin-top:1px;'>Zero-Count Verification</div>"
+                "<div style='width:32px;height:3px;background:#1a6fd4;border-radius:2px;margin-top:4px;'></div>"
+                "</div>", unsafe_allow_html=True)
+
+            reset_df = pd.DataFrame(reset_results)
+            total_r = len(reset_df)
+            pass_r = int((reset_df["Status"] == "✅ Pass").sum())
+            fail_r = int((reset_df["Status"] == "❌ Fail").sum())
+            flag_r = int((reset_df["Status"] == "⚠️ Flag").sum())
+
+            rc1s, rc2s, rc3s, rc4s = st.columns(4)
+            for col, label, val, color in [
+                (rc1s, "Total Resources", total_r, "#0d2d5e"),
+                (rc2s, "✅ Reset Complete", pass_r, "#16a34a"),
+                (rc3s, "❌ Still Has Data", fail_r, "#dc2626"),
+                (rc4s, "⚠️ Flagged", flag_r, "#d97706"),
+            ]:
+                with col:
+                    st.markdown(
+                        f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid {color};"
+                        f"border-radius:10px;padding:14px;text-align:center;'>"
+                        f"<div style='font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;text-transform:uppercase;'>{label}</div>"
+                        f"<div style='font-size:26px;font-weight:800;color:{color};'>{val}</div>"
+                        f"</div>", unsafe_allow_html=True)
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            def style_reset_df(df):
+                def color_row(row):
+                    if row["Status"] == "✅ Pass": return ["background-color:#f0fdf4"] * len(row)
+                    if row["Status"] == "⚠️ Flag": return ["background-color:#fffbeb"] * len(row)
+                    return ["background-color:#fef2f2"] * len(row)
+                return df.style.apply(color_row, axis=1)
+
+            display_reset = reset_df.drop(columns=["URL"], errors="ignore")
+            st.dataframe(style_reset_df(display_reset), width="stretch", hide_index=True)
+
+            if pass_r == total_r:
+                st.success("🎉 All resources verified — Financial Data Reset is COMPLETE. All records returned zero count.")
+            else:
+                st.error(f"⚠️ Reset verification INCOMPLETE — {fail_r} resource(s) still have data. Vendor must complete the reset before certification can proceed.")
+
+    st.stop()
+
+
+# ════════════════════════════════════════════════════════════════════
+# MAIN UI — Finance Data Verification page
+# ════════════════════════════════════════════════════════════════════
+
+# ── FIX 3: Dynamic ribbon for Finance Data Verification page ──
+render_top_ribbon(
+    page_title="School Finance Vendor Certification",
+    page_subtitle="Ed-Fi ODS 2026 · Indiana DOE"
 )
 
 # ════════════════════════════════════════════════════════════════════
@@ -2187,7 +2579,6 @@ for row_start in range(0, n, 2):
                 st.session_state.finance_record_data[i] = {"account_id": acc_id, "edorg_id": edorg, "fiscal_year": fy, "approved_budget": budget}
             if changed:
                 propagate_query_params_to_all(acc_id, edorg, fy, record_index=i)
-            # Store budget in map
             if acc_id.strip() and budget.strip():
                 try:
                     st.session_state.approved_budget_map[acc_id.strip()] = float(budget.strip())
@@ -2423,7 +2814,6 @@ if run:
 # RESULTS
 # ════════════════════════════════════════════════════════════════════
 def _result_heading(badge: str, title: str, subtitle: str):
-    """Render a consistent result section heading."""
     st.markdown(
         f"<div style='margin-bottom:10px;margin-top:6px;'>"
         f"<span style='font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;"
@@ -2437,7 +2827,6 @@ def _result_heading(badge: str, title: str, subtitle: str):
 
 
 def _stat_card(col, label: str, value, color: str):
-    """Render a consistent stat summary card."""
     with col:
         st.markdown(
             f"<div style='background:#f8fafc;border:1px solid #e2e8f0;border-top:3px solid {color};"
@@ -2447,6 +2836,7 @@ def _stat_card(col, label: str, value, color: str):
             f"</div>",
             unsafe_allow_html=True,
         )
+
 if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     # ── Result 1: API Response ────────────────────────────────────────
@@ -2563,9 +2953,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
     # Collect all target dfs for cross-validations
     all_target_dfs_for_cross = {res: st.session_state[f"fin_target_{res}"] for res in FINANCE_RESOURCES}
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 3: BUSINESS RULES (Core + §5 Time + §8 Reasonability)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 3: Business Rules ──────────────────────────────────────
     _result_heading(
         "Result 3 · Financial Integrity",
         "Business Rule Validation",
@@ -2638,9 +3026,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 4: CROSS-TABLE FINANCIAL CONSISTENCY
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 4: Cross-Table ─────────────────────────────────────────
     _result_heading(
         "Result 4 · Cross-Table Consistency",
         "Cross-Table Spending vs Actual Amount",
@@ -2657,7 +3043,6 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
         cross_flag  = int((cross_table_df["Status"] == "⚠️ Flag").sum())
         cross_skip  = int((cross_table_df["Status"] == "⏭ Skipped").sum())
         cross_total = len(cross_table_df)
-        cross_ok    = cross_fail == 0
         c1, c2, c3, c4 = st.columns(4)
         for col, label, val, color in [
             (c1, "Total Checks", cross_total, "#0d2d5e"),
@@ -2680,9 +3065,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 5: BUDGET & ALLOCATION VALIDATIONS (NEW)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 5: Budget ──────────────────────────────────────────────
     _result_heading(
         "Result 5 · Budget & Allocation",
         "Actual Amount vs Approved Budget & Allocation Balance",
@@ -2711,9 +3094,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 6: DUPLICATE DETECTION (NEW)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 6: Duplicate Detection ─────────────────────────────────
     _result_heading(
         "Result 6 · Duplicate Detection",
         "Duplicate Transaction & Double-Count Check",
@@ -2742,9 +3123,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 7: FUND & CLASSIFICATION RULES (NEW)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 7: Fund & Classification ──────────────────────────────
     _result_heading(
         "Result 7 · Fund & Classification",
         "Fund Code Purpose Alignment & ObjectCode Classification",
@@ -2774,9 +3153,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 8: MULTI-YEAR & CONTRACT VALIDATIONS (NEW)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 8: Multi-Year ──────────────────────────────────────────
     _result_heading(
         "Result 8 · Multi-Year & Contract",
         "Contract Amount Distribution & Multi-Year Alignment",
@@ -2806,9 +3183,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 9: LIFECYCLE & PROCESS VALIDATIONS (NEW)
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 9: Lifecycle ───────────────────────────────────────────
     _result_heading(
         "Result 9 · Lifecycle & Process",
         "Transaction Lifecycle: Account → Actual → Payments",
@@ -2837,9 +3212,7 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
     st.divider()
 
-    # ════════════════════════════════════════════════════════════════
-    # Result 10: DESCRIPTOR CONSISTENCY
-    # ════════════════════════════════════════════════════════════════
+    # ── Result 10: Descriptor Consistency ────────────────────────────
     _result_heading(
         "Result 10 · Reporting Consistency",
         "FinancialCollectionDescriptor Consistency",
@@ -2896,7 +3269,6 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
     # ── Download ──────────────────────────────────────────────────────
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        # Summary
         summary_rows = []
         for res in FINANCE_RESOURCES:
             vdf = finance_val_dfs[res]
@@ -2918,19 +3290,16 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
 
         pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
-        # Raw data sheets
         for res in FINANCE_RESOURCES:
             st.session_state[f"fin_target_{res}"].to_excel(writer, sheet_name=f"Target_{res[:15]}", index=False)
             if not finance_val_dfs[res].empty:
                 finance_val_dfs[res].to_excel(writer, sheet_name=f"FieldVal_{res[:13]}", index=False)
 
-        # Business rules
         for res in BUSINESS_RULE_RESOURCES:
             bdf = biz_rule_dfs.get(res, pd.DataFrame())
             if not bdf.empty:
                 bdf.to_excel(writer, sheet_name=f"BizRules_{res[:12]}", index=False)
 
-        # All invalid fields combined
         all_parts = [df.assign(Resource=res) for res, df in finance_val_dfs.items() if not df.empty]
         if all_parts:
             combined = pd.concat(all_parts, ignore_index=True)
@@ -2938,7 +3307,6 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
             if not inv.empty:
                 inv.to_excel(writer, sheet_name="All_Invalid_Fields", index=False)
 
-        # All failed business rules
         biz_parts = [bdf.assign(Resource=res) for res, bdf in biz_rule_dfs.items() if not bdf.empty]
         if biz_parts:
             biz_combined = pd.concat(biz_parts, ignore_index=True)
@@ -2946,49 +3314,42 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
             if not biz_fails.empty:
                 biz_fails.to_excel(writer, sheet_name="Failed_BizRules", index=False)
 
-        # Cross-table
         if not cross_table_df.empty:
             cross_table_df.to_excel(writer, sheet_name="S2_CrossTable", index=False)
             cross_fails = cross_table_df[cross_table_df["Status"] == "❌ Fail"]
             if not cross_fails.empty:
                 cross_fails.to_excel(writer, sheet_name="S2_CrossTable_Fails", index=False)
 
-        # Budget
         if not budget_df.empty:
             budget_df.to_excel(writer, sheet_name="S3_Budget_Allocation", index=False)
             bud_fails = budget_df[budget_df["Status"] == "❌ Fail"]
             if not bud_fails.empty:
                 bud_fails.to_excel(writer, sheet_name="S3_Budget_Fails", index=False)
 
-        # Duplicates
         if not dup_df.empty:
             dup_df.to_excel(writer, sheet_name="S4_Duplicate_Detection", index=False)
             dup_fails = dup_df[dup_df["Status"].isin(["❌ Fail", "⚠️ Flag"])]
             if not dup_fails.empty:
                 dup_fails.to_excel(writer, sheet_name="S4_Duplicate_Issues", index=False)
 
-        # Fund Classification
         if not fund_class_df.empty:
             fund_class_df.to_excel(writer, sheet_name="S6_Fund_Classification", index=False)
             fc_fails = fund_class_df[fund_class_df["Status"].isin(["❌ Fail", "⚠️ Flag"])]
             if not fc_fails.empty:
                 fc_fails.to_excel(writer, sheet_name="S6_Fund_Issues", index=False)
 
-        # Multi-year
         if not multi_year_df.empty:
             multi_year_df.to_excel(writer, sheet_name="S7_MultiYear_Contract", index=False)
             my_fails = multi_year_df[multi_year_df["Status"].isin(["❌ Fail", "⚠️ Flag"])]
             if not my_fails.empty:
                 my_fails.to_excel(writer, sheet_name="S7_MultiYear_Issues", index=False)
 
-        # Lifecycle
         if not lifecycle_df.empty:
             lifecycle_df.to_excel(writer, sheet_name="S9_Lifecycle_Process", index=False)
             lc_fails = lifecycle_df[lifecycle_df["Status"] == "❌ Fail"]
             if not lc_fails.empty:
                 lc_fails.to_excel(writer, sheet_name="S9_Lifecycle_Fails", index=False)
 
-        # Descriptor
         if not desc_consistency_df.empty:
             desc_consistency_df.to_excel(writer, sheet_name="S10_Descriptor_Consistency", index=False)
 
@@ -3001,23 +3362,3 @@ if all(f"fin_target_{res}" in st.session_state for res in FINANCE_RESOURCES):
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             width="stretch",
         )
-
-
-# ─────────────────────────────────────────────────────────────────
-# SIDEBAR — with vendor info + logout
-# ─────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown(
-        "<div style='padding:14px 12px 10px;border-bottom:1px solid #e2e8f0;margin-bottom:4px;'>"
-        "<div style='font-size:15px;font-weight:800;color:#0d2d5e;'>🎓&nbsp; EdWise Group</div>"
-        "<div style='font-size:10px;font-weight:600;color:#94a3b8;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;'>Vendor Certification Portal</div>"
-        "</div>", unsafe_allow_html=True)
-
-
-    # ── Vendor info + logout ──────────────────────────────────────
-    render_logout_button(sidebar=True)
-    st.markdown(
-        f"<div style='padding:4px 12px 8px;font-size:11px;color:#94a3b8;'>"
-        f"v3.0.0 · Ed-Fi ODS 2026 · Indiana DOE</div>",
-        unsafe_allow_html=True,
-    )

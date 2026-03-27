@@ -1,11 +1,12 @@
 """
 EdWise Group — Finance Authentication Module
-File: finance_auth.py
+File: auth.py
 Usage: Import in School Finance pages only.
 """
 
 import streamlit as st
 import hashlib
+import uuid
 
 # ─────────────────────────────────────────────────────────────────
 # VENDOR REGISTRY
@@ -142,18 +143,24 @@ def render_login_page():
     )
 
 
-def render_logout_button(sidebar=True):
-    """Renders logout button (to be used in sidebar)."""
+def render_logout_button(sidebar=False):
+    """
+    Renders a logout button in Streamlit (sidebar or main page)
+    with a unique key to avoid StreamlitDuplicateElementKey errors.
+    """
     vendor_name = st.session_state.get("vendor_name", "Unknown")
-    block = (st.sidebar if sidebar else st)
+    container = st.sidebar if sidebar else st
 
-    block.markdown(
+    container.markdown(
         f"<div style='padding:10px 12px 6px;border-top:1px solid #e2e8f0;margin-top:8px;'>"
         f"<div style='font-size:11px;font-weight:700;color:#64748b;'>Signed in as</div>"
         f"<div style='font-size:12px;font-weight:600;color:#0d2d5e;margin-top:2px;'>{vendor_name}</div>"
         f"</div>",
         unsafe_allow_html=True,
     )
+
+    # Use a unique ID to prevent duplicate key errors
+    key_name = f"logout_btn_finance_{'sidebar' if sidebar else 'main'}_{uuid.uuid4().hex[:6]}"
 
     with (st.sidebar if sidebar else st):
         if st.button("🔓 Sign Out", key="logout_btn_finance", use_container_width=True):
